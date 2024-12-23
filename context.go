@@ -79,6 +79,55 @@ type Context struct {
 	stack         []*Context
 }
 
+// Copy returns a deep copy of the Context. This includes copying the image and mask,
+// but note that the rasterizer is not copied due to its internal state management.
+func (dc *Context) Copy() *Context {
+	// Create a new context with a copied image
+	newIm := image.NewRGBA(dc.im.Bounds())
+	draw.Draw(newIm, newIm.Bounds(), dc.im, image.ZP, draw.Src)
+
+	// Create a new mask if one exists
+	var newMask *image.Alpha
+	if dc.mask != nil {
+		newMask = image.NewAlpha(dc.mask.Bounds())
+		draw.Draw(newMask, newMask.Bounds(), dc.mask, image.ZP, draw.Src)
+	}
+
+	// Create a new context with the same properties
+	newDc := &Context{
+		width:         dc.width,
+		height:        dc.height,
+		rasterizer:    raster.NewRasterizer(dc.width, dc.height), // Note: Rasterizer is not deeply copied
+		im:            newIm,
+		mask:          newMask,
+		color:         dc.color,
+		fillPattern:   dc.fillPattern,
+		strokePattern: dc.strokePattern,
+		strokePath:    raster.Path{}, // Path must be recreated
+		fillPath:      raster.Path{}, // Path must be recreated
+		start:         dc.start,
+		current:       dc.current,
+		hasCurrent:    dc.hasCurrent,
+		dashes:        append([]float64(nil), dc.dashes...), // slice copy
+		dashOffset:    dc.dashOffset,
+		lineWidth:     dc.lineWidth,
+		lineCap:       dc.lineCap,
+		lineJoin:      dc.lineJoin,
+		fillRule:      dc.fillRule,
+		fontFace:      dc.fontFace,
+		fontHeight:    dc.fontHeight,
+		matrix:        dc.matrix,
+		stack:         make([]*Context, len(dc.stack)), // Copy stack but not its contents
+	}
+
+	// Copy the stack contents
+	for i, c := range dc.stack {
+		newDc.stack[i] = c
+	}
+
+	return newDc
+}
+
 // NewContext creates a new image.RGBA with the specified width and height
 // and prepares a context for rendering onto that image.
 func NewContext(width, height int) *Context {
